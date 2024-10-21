@@ -1,0 +1,178 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Libreria extends JFrame {
+    private JTabbedPane tabbedPane;
+    private JTextArea statusTextArea;
+    private JTextField titleField, authorField, yearField, plotField, settingField;
+    private DefaultTableModel tableModel;
+    private JLabel searchResultLabel;
+    private List<String[]> allBooks;
+
+    public Libreria() {
+        super("Library");
+
+        // Configuración de la ventana principal
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(600, 400);
+
+        // Creación del JTabbedPane
+        tabbedPane = new JTabbedPane();
+
+        // Tab 1: Registrar libro en el archivo Libros.txt
+        JPanel tab1Panel = new JPanel(new GridLayout(7, 2));
+        tab1Panel.setBackground(new Color(173, 216, 230));  // Color de fondo azul claro
+        tab1Panel.add(new JLabel("Título del libro:"));
+        titleField = new JTextField();
+        tab1Panel.add(titleField);
+        tab1Panel.add(new JLabel("Autor:"));
+        authorField = new JTextField();
+        tab1Panel.add(authorField);
+        tab1Panel.add(new JLabel("Año de publicación:"));
+        yearField = new JTextField();
+        tab1Panel.add(yearField);
+        tab1Panel.add(new JLabel("Trama:"));
+        plotField = new JTextField();
+        tab1Panel.add(plotField);
+        tab1Panel.add(new JLabel("Ambientación:"));
+        settingField = new JTextField();
+        tab1Panel.add(settingField);
+
+        JButton registerButton = new JButton("Registrar Libro");
+        registerButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String title = titleField.getText();
+                String author = authorField.getText();
+                String year = yearField.getText();
+                String plot = plotField.getText();
+                String setting = settingField.getText();
+
+                if (title.isEmpty() || author.isEmpty() || year.isEmpty() || plot.isEmpty() || setting.isEmpty()) {
+                    JOptionPane.showMessageDialog(Libreria.this, "Por favor, complete todos los campos", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                // BufferedWriter: Escribir el nuevo libro al archivo Libros.txt con 
+                try (BufferedWriter bw = new BufferedWriter(new FileWriter("Libros.txt", true))) {
+                    bw.write(title + ";" + author + ";" + year + ";" + plot + ";" + setting);
+                    bw.newLine();
+                    JOptionPane.showMessageDialog(Libreria.this, "Libro registrado exitosamente", "Registro de Libro", JOptionPane.INFORMATION_MESSAGE);
+                    
+                    // Actualizar la lista y la tabla despues de registrar el libro
+                    allBooks.add(new String[] { title, author, year, plot, setting });
+                    updateTable();
+                    
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(Libreria.this, "Error al registrar el libro", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        tab1Panel.add(registerButton);
+
+        tabbedPane.addTab("Registrar Libro", tab1Panel);
+
+        // Inicializar modelo de la tabla para Tab 2
+        String[] columnNames = {"Libro", "Autor", "Año de publicación", "Trama", "Ambientación"};
+        tableModel = new DefaultTableModel(columnNames, 0);
+
+        // Obtener todos los datos desde el archivo Libros.txt y llenar la tabla
+        allBooks = readDataFromFile("Libros.txt");
+        updateTable();
+
+        // Tab 2: Buscar libro y mostrar en JTable
+        JPanel tab2Panel = new JPanel(new BorderLayout());
+        tab2Panel.setBackground(new Color(173, 216, 230));  // Color de fondo azul claro
+        JPanel searchPanel = new JPanel();
+        JTextField searchField = new JTextField(20);
+        JButton searchButton = new JButton("Buscar");
+        searchResultLabel = new JLabel();
+        searchPanel.add(new JLabel("Buscar libro:"));
+        searchPanel.add(searchField);
+        searchPanel.add(searchButton);
+        tab2Panel.add(searchPanel, BorderLayout.NORTH);
+
+        JTable table = new JTable(tableModel);
+        JScrollPane scrollPane = new JScrollPane(table);
+        tab2Panel.add(scrollPane, BorderLayout.CENTER);
+        tab2Panel.add(searchResultLabel, BorderLayout.SOUTH); // Result label
+
+        searchButton.addActionListener(new ActionListener() { //evento boton buscar
+            @Override
+            public void actionPerformed(ActionEvent e) { 
+                String searchTerm = searchField.getText().trim();
+                boolean found = false;
+                tableModel.setRowCount(0); // Limpiar la tabla
+
+                // Actualizar la lista y la tabla después de registrar el libro
+                allBooks = readDataFromFile("Libros.txt");
+                updateTable();
+
+                for (String[] book : allBooks) {
+                    if (book[0].equalsIgnoreCase(searchTerm)) {
+                        tableModel.addRow(book);
+                        found = true;
+                    }
+                }
+
+                if (!found) {
+                    searchResultLabel.setText("Libro no encontrado");
+                } else {
+                    searchResultLabel.setText("Busqueda encontrada!");
+                }
+            }
+        });
+
+        tabbedPane.addTab("Buscar Libro", tab2Panel);
+
+        // Agregar el JTabbedPane al JFrame
+        add(tabbedPane);
+
+        // Configuración del área de estado
+        statusTextArea = new JTextArea(5, 40);
+        statusTextArea.setEditable(false);
+        add(new JScrollPane(statusTextArea), BorderLayout.SOUTH);
+
+        // Mostrar la ventana
+        setVisible(true);
+    }
+
+    // Método para leer datos desde un archivo y retornarlos como una lista de arrays de Strings
+    private List<String[]> readDataFromFile(String filename) {
+        List<String[]> data = new ArrayList<>();
+        // BufferedReader
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(";");
+                data.add(parts);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return data;
+    }
+
+    // Método para actualizar la tabla con los datos del archivo Libros.txt
+    private void updateTable() {
+        // Limpiar tabla actual
+        tableModel.setRowCount(0);
+
+        // Llenar la tabla con los datos de allBooks
+        for (String[] row : allBooks) {
+            tableModel.addRow(row);
+        }
+    }
+
+    public static void main(String[] args) {
+        // Crear la ventana de la aplicación en el hilo de eventos de Swing
+        SwingUtilities.invokeLater(() -> new Libreria());
+    }
+}
